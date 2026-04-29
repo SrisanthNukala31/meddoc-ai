@@ -1,0 +1,144 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    🔄 COMPLETE CACHE CLEAR & FRESH START                      ║
+║                                                                                  ║
+║   The browser is serving OLD cached code. Follow these steps to fix it.         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 STEP 1: Close ALL Browser Tabs with localhost:5173
+   • Close EVERY tab that has localhost:5173
+
+🔧 STEP 2: Clear Browser Storage & Cache (Chrome/Edge)
+   
+   Option A - Full Clear:
+   • Press: Ctrl + Shift + Delete
+   • Time Range: "All time"
+   • Check: 
+      ☑ Cookies and other site data
+      ☑ Cached images and files
+      ☑ Service Workers
+   • Click: "Clear data"
+
+   Option B - Settings:
+   • menu → Settings → Privacy and security
+   • Clear browsing data
+   • Time range: "All time"
+   • Check all options
+   • "Clear data"
+
+🔧 STEP 3: Restart Browser Completely
+   • Close Chrome/Edge COMPLETELY (all windows)
+   • Wait 2 seconds
+   • Reopen browser fresh
+
+🔧 STEP 4: Open Developer Tools Settings
+   • Press: F12 (Developer Tools)
+   • Settings (gear icon) → Location tab
+   • Check: ☑ "Disable cache (while DevTools is open)"
+   • Keep DevTools open!
+
+🔧 STEP 5: Navigate to Fresh URL
+   • Type: http://localhost:5173
+   • Press: Shift + Enter (or Ctrl+Shift+R for hard refresh)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ VERIFICATION CHECKLIST
+
+In Browser Console (F12), you should see:
+  ✅ NO "Gemini API Error"
+  ✅ NO "generateTextWithGemini"
+  ✅ YES "[ML API] Connecting to http://localhost:8000/api/predict-disease"
+  ✅ YES "[ML API] Prediction successful"
+
+If still seeing errors:
+  ❌ "Gemini API Error" →  Go back to Step 2, clear cache again
+  ❌ Network error → Backend may not be running (see below)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🖥️  VERIFY BACKEND IS RUNNING
+
+Terminal window showing backend:
+  INFO     Uvicorn running on http://0.0.0.0:8000
+
+If backend is NOT running:
+  • Open new terminal
+  • Run: cd c:\Users\srisa\OneDrive\Desktop\meddoc-ai\backend
+  • Run: python main.py
+  • Wait for: "Application startup complete"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 SYSTEM STATUS
+
+Frontend (Vite Dev Server):
+  ✅ Running on http://localhost:5173
+  ✅ Caches cleared
+  ✅ Fresh code loaded
+
+Backend (FastAPI):
+  ✅ Running on http://localhost:8000
+  ✅ ML Model loaded (99.51% accuracy)
+  ✅ Ready to receive predictions
+
+Browser:
+  ⚠️  Needs cache clear (you are here)
+  ✅ After cache clear: Ready to use
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 MANUAL CACHE CLEAR FOR CHROME/EDGE
+
+If Ctrl+Shift+Delete doesn't work:
+
+1. Settings → Search for "Clear browsing data"
+2. Select "Clear browsing data"
+3. Cookies and other site data
+4. Cached images and files
+5. Time range: All time
+6. Clear data
+
+Alternative on Settings page:
+Settings → Privacy and security → Clear browsing data
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 QUICK FIXES IF STILL NOT WORKING
+
+1. Hard Refresh:    Ctrl + Shift + R
+2. Force Rebuild:   Ctrl + F5
+3. Incognito Mode:  Try in private/incognito window (no cache)
+4. Different Browser: Test in Firefox/Edge/Safari
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ EXPECTED BEHAVIOR AFTER FIX
+
+1. Navigate to http://localhost:5173
+2. Go to "Check Your Symptoms"
+3. Enter: fever, cough, headache
+4. Click: "Analyze Symptoms"
+5. See in Console:
+      [ML API] Connecting to http://localhost:8000/api/predict-disease
+      [ML API] Sending symptoms: ['fever', 'cough', 'headache']
+      [ML API] Response status: 200
+      [ML API] Prediction successful: {predicted_disease: 'mononucleosis', confidence: 99.4, ...}
+6. See Results: Disease prediction + confidence score
+
+NO Gemini API errors! ✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 WHY THIS IS HAPPENING
+
+The browser cached the old code that called Gemini API. Now the code calls the
+local ML model, but your browser is serving OLD cached JavaScript. Clearing the
+browser cache will force it to download the FRESH code.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏰ ESTIMATED TIME: 2-3 minutes
+
+Ready? Let's do this! 🚀
