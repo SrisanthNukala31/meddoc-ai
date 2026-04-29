@@ -95,7 +95,56 @@ Example output: ["headache", "fever"]`;
         }
         mlData = await predictionRes.json();
       } catch (e) {
-        throw new Error(`ML Engine Error: ${e.message}`);
+        // "Just for now": if the local `.pkl` model isn't loaded in the deployed backend,
+        // keep the UI functional by falling back to your existing Groq/Gemini/Cohere cascade.
+        console.warn("Local ML prediction failed; using cascade fallback:", e);
+        try {
+          const fallbackPrompt = `You are a medical symptom classifier.
+
+Given the user's symptoms, output a best-guess disease name and a confidence score.
+
+INPUT:
+- Symptoms (normalized): ${JSON.stringify([...new Set([...symptoms, ...canonicalArr])])}
+- Recognized symptoms from the ML feature mapping (use this list for recognized_symptoms):
+  ${JSON.stringify(canonicalArr)}
+
+OUTPUT RULES:
+Return ONLY valid JSON with exactly these keys:
+{
+  "predicted_disease": "string",
+  "confidence": number, 0-100,
+  "recognized_symptoms": array of strings (must equal the input recognized symptoms list)
+}
+
+No markdown, no extra text.`;
+
+          const fallbackText = await generateTextFallback([
+            { name: 'Gemini', fn: generateTextWithGemini, apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 },
+            { name: 'Cohere', fn: generateTextWithCohere, apiKey: import.meta.env.VITE_COHERE_API_KEY_1 },
+            { name: 'Groq', fn: generateTextWithGroq, apiKey: import.meta.env.VITE_GROQ_API_KEY_1 }
+          ], fallbackPrompt);
+
+          const cleaned = fallbackText.replace(/```json|```/g, '').trim();
+          const parsed = JSON.parse(cleaned);
+
+          mlData = {
+            predicted_disease: parsed?.predicted_disease || 'Unable to classify',
+            confidence: Number(parsed?.confidence),
+            recognized_symptoms: Array.isArray(parsed?.recognized_symptoms) ? parsed.recognized_symptoms : canonicalArr
+          };
+
+          if (!Number.isFinite(mlData.confidence)) mlData.confidence = 0;
+          if (!Array.isArray(mlData.recognized_symptoms) || mlData.recognized_symptoms.length === 0) {
+            mlData.recognized_symptoms = canonicalArr;
+          }
+        } catch (fallbackErr) {
+          console.error("Cascade fallback failed:", fallbackErr);
+          mlData = {
+            predicted_disease: 'Unable to connect to analysis service',
+            confidence: 0,
+            recognized_symptoms: canonicalArr
+          };
+        }
       }
       
       const { predicted_disease, confidence, recognized_symptoms } = mlData;
