@@ -277,8 +277,8 @@ def _load_disease_model():
         if not base_path:
             raise FileNotFoundError("Could not find ML files (feature_columns.pkl) in any expected directory.")
 
-        # Try loading models in order of preference (large to small)
-        model_names = ['model.pkl', 'model_xgb_fast.pkl', 'model_bernoulli_nb.pkl']
+        # Try loading models in order of preference (Highest Accuracy First)
+        model_names = ['model_bernoulli_nb.pkl', 'model.pkl', 'model_xgb_fast.pkl']
         model_loaded = False
         
         for m_name in model_names:
