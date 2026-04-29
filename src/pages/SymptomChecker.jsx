@@ -89,10 +89,13 @@ Example output: ["headache", "fever"]`;
           body: JSON.stringify({ symptoms: [...new Set([...symptoms, ...canonicalArr])] })
         });
         
-        if (!predictionRes.ok) throw new Error("Backend connection failed");
+        if (!predictionRes.ok) {
+          const errData = await predictionRes.json().catch(() => ({}));
+          throw new Error(errData.detail || "Backend connection failed or ML model is not loaded.");
+        }
         mlData = await predictionRes.json();
       } catch (e) {
-        throw new Error("Local ML Engine is currently offline. Please ensure the backend server is running on port 8000.");
+        throw new Error(`ML Engine Error: ${e.message}`);
       }
       
       const { predicted_disease, confidence, recognized_symptoms } = mlData;
