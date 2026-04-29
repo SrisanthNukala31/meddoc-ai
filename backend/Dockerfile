@@ -3,11 +3,7 @@ FROM python:3.10-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies required for OpenCV
-RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+# Removed apt-get install since opencv-python-headless doesn't require GUI libraries
 
 # Copy requirements and install
 COPY requirements.txt .
