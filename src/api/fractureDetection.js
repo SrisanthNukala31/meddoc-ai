@@ -1,7 +1,7 @@
 // X-Ray Fracture & Dislocation Detection API
 // Connects to Python FastAPI backend
 
-const FRACTURE_API_BASE_URL = 'http://localhost:8000';
+const FRACTURE_API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
 // Analyze X-ray image for fractures and dislocations
 export async function analyzeXRayForFractures(imageFile) {

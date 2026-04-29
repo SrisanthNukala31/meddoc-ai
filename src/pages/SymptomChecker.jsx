@@ -21,7 +21,8 @@ export default function SymptomChecker() {
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        const res = await fetch('http://localhost:8000/health');
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        const res = await fetch(`${backendUrl}/health`);
         if (res.ok) {
           setBackendStatus('online');
         } else {
@@ -81,7 +82,8 @@ Example output: ["headache", "fever"]`;
       // Step 2: LOCAL ML PREDICTION (Crucial - Prediction is ALWAYS done here)
       let mlData;
       try {
-        const predictionRes = await fetch('http://localhost:8000/api/predict-disease', {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        const predictionRes = await fetch(`${backendUrl}/api/predict-disease`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ symptoms: [...new Set([...symptoms, ...canonicalArr])] })

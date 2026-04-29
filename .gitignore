@@ -25,10 +25,10 @@ dist-ssr
 
 # Avoid Vite/Tailwind scanning massive ML files
 ml/
-backend/
 *.pkl
-*.pt
 *.csv
+# Keep *.pt model files out of git (too large - download separately)
+*.pt
 
 # Environment variables - NEVER commit these
 .env
