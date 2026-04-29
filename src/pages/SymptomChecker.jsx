@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Plus, X, Search, AlertCircle, CheckCircle, Info, ShieldAlert, Stethoscope } from 'lucide-react';
 import { generateTextWithGemini } from '../api/gemini';
 import { generateTextWithCohere } from '../api/cohere';
 import { generateTextWithGroq } from '../api/groq';
 import { generateTextFallback } from '../api/cascadeRouter';
+import { getLocalAdvice } from '../api/medicalAdvisor';
+import canonicalSymptoms from '../data/symptoms.json';
 
 export default function SymptomChecker() {
   const [symptoms, setSymptoms] = useState([]);
@@ -14,6 +16,24 @@ export default function SymptomChecker() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [backendStatus, setBackendStatus] = useState('checking');
+
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        const res = await fetch(`${backendUrl}/health`);
+        if (res.ok) {
+          setBackendStatus('online');
+        } else {
+          setBackendStatus('offline');
+        }
+      } catch (e) {
+        setBackendStatus('offline');
+      }
+    };
+    checkBackend();
+  }, []);
 
   const addSymptom = () => {
     if (input.trim() && !symptoms.includes(input.trim())) {
@@ -35,49 +55,121 @@ export default function SymptomChecker() {
     setResult(null);
 
     try {
-      const formatterPrompt = `You are an expert medical diagnostic AI.
-Patient Profile: ${age ? age + '-year-old ' : ''}${gender || 'person'}.
-Symptoms Reported: [${symptoms.join(', ')}].
+      // Step 1: Map colloquial symptoms to exact ML features using AI (Try Groq)
+      let canonicalArr = [];
+      try {
+        const mapPrompt = `You are a medical symptom mapper.
+User input: [${symptoms.join(', ')}].
+Your task is to correct any spelling mistakes, typos, or colloquial language in the user input, and map them to the EXACT matching terms from this canonical list: ${JSON.stringify(canonicalSymptoms)}.
+Return ONLY a valid JSON array of strings from the list.
+Example output: ["headache", "fever"]`;
+        
+        const mappedResponse = await generateTextFallback([
+          { name: 'Gemini', fn: generateTextWithGemini, apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 },
+          { name: 'Cohere', fn: generateTextWithCohere, apiKey: import.meta.env.VITE_COHERE_API_KEY_1 },
+          { name: 'Groq', fn: generateTextWithGroq, apiKey: import.meta.env.VITE_GROQ_API_KEY_1 }
+        ], mapPrompt);
+        const cleanedMap = mappedResponse.replace(/```json|```/g, '').trim();
+        canonicalArr = JSON.parse(cleanedMap);
+      } catch (e) {
+        console.warn("AI mapping failed, using local matching fallback:", e);
+        canonicalArr = symptoms.map(s => {
+          const lowerS = s.toLowerCase().trim();
+          return canonicalSymptoms.find(cs => cs.toLowerCase() === lowerS) || s;
+        });
+      }
+
+      // Step 2: LOCAL ML PREDICTION (Crucial - Prediction is ALWAYS done here)
+      let mlData;
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        const predictionRes = await fetch(`${backendUrl}/api/predict-disease`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symptoms: [...new Set([...symptoms, ...canonicalArr])] })
+        });
+        
+        if (!predictionRes.ok) {
+          const errData = await predictionRes.json().catch(() => ({}));
+          throw new Error(errData.detail || "Backend connection failed or ML model is not loaded.");
+        }
+        mlData = await predictionRes.json();
+      } catch (e) {
+        throw new Error(`ML Engine Error: ${e.message}`);
+      }
+      
+      const { predicted_disease, confidence, recognized_symptoms } = mlData;
+
+      // Step 3: Provide context (Try Groq, then Fallback to Local Advisor)
+      let finalResult;
+      const localAdvice = getLocalAdvice(predicted_disease);
+
+      try {
+        const formatterPrompt = `You are a professional medical assistant.
+Patient: ${age ? age + '-year-old ' : ''}${gender || 'person'}.
+Symptoms Reported: ${symptoms.join(', ')}.
+INITIAL ML DIAGNOSIS: "${predicted_disease}" with ${confidence}% confidence.
 
 CRITICAL INSTRUCTION: 
-1. Evaluate the symptoms carefully and identify the most likely medical condition.
-2. Ensure the condition is biologically possible for a ${age ? age + '-year-old ' : ''}${gender || 'person'}.
-3. Provide a detailed, accurate medical analysis.
+1. Check if the INITIAL ML DIAGNOSIS is biologically possible for a ${age ? age + '-year-old ' : ''}${gender || 'person'}. (e.g. A male cannot have Hyperemesis gravidarum or pregnancy-related conditions).
+2. If the ML diagnosis CONTRADICTS the patient's gender or age, YOU MUST override it with the most logically sound clinical alternative that shares these symptoms for this specific demographic.
+3. If the ML diagnosis is biologically possible, use it directly.
 
-Generate your response in EXACTLY this JSON format (no markdown, no extra text):
+Generate a detailed medical analysis in JSON format:
 {
   "possible_conditions": [
     {
-      "name": "Primary Suspected Condition",
-      "probability": "High",
-      "description": "Provide a detailed medical description of the condition.",
-      "symptoms_match": ["matched symptom 1", "matched symptom 2"]
+      "name": "VALIDATED DIAGNOSIS (Use your demographic-corrected override if needed, otherwise use ${predicted_disease})",
+      "probability": "High (Confidence: ${confidence}%)",
+      "description": "Provide a detailed medical description of the validated diagnosis.",
+      "symptoms_match": ${JSON.stringify(recognized_symptoms)}
     }
   ],
-  "severity": "Mild", 
-  "recommendation": "Specific medical advice for this condition.",
-  "immediate_action": false,
-  "precautions": ["List 3-4 specific precautions"],
-  "specialist_recommendation": "Which specific specialist should they see?",
+  "severity": "Mild/Moderate/Severe based on ${predicted_disease}",
+  "recommendation": "Specific medical advice for ${predicted_disease}",
+  "immediate_action": true/false (if life-threatening),
+  "precautions": ["List 3-4 specific precautions for ${predicted_disease}"],
+  "specialist_recommendation": "Which specific specialist should they see for ${predicted_disease}?",
   "do_list": ["3 specific things to do"],
   "dont_list": ["3 specific things to avoid"],
-  "questions_to_ask_doctor": ["3 relevant questions"],
-  "disclaimer": "This analysis is generated by an AI assistant for educational purposes and is not a substitute for professional medical advice."
-}`;
+  "questions_to_ask_doctor": ["3 relevant questions about ${predicted_disease}"],
+  "disclaimer": "This analysis is anchored by our local ML diagnostic engine."
+}
+Return ONLY valid JSON.`;
 
-      const response = await generateTextFallback([
-        { name: 'Gemini', fn: generateTextWithGemini, apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 },
-        { name: 'Cohere', fn: generateTextWithCohere, apiKey: import.meta.env.VITE_COHERE_API_KEY_1 },
-        { name: 'Groq', fn: generateTextWithGroq, apiKey: import.meta.env.VITE_GROQ_API_KEY_1 }
-      ], formatterPrompt);
-      
-      const cleaned = response.replace(/```json|```/g, '').trim();
-      const finalResult = JSON.parse(cleaned);
+        const response = await generateTextFallback([
+          { name: 'Gemini', fn: generateTextWithGemini, apiKey: import.meta.env.VITE_GEMINI_API_KEY_1 },
+          { name: 'Cohere', fn: generateTextWithCohere, apiKey: import.meta.env.VITE_COHERE_API_KEY_1 },
+          { name: 'Groq', fn: generateTextWithGroq, apiKey: import.meta.env.VITE_GROQ_API_KEY_1 }
+        ], formatterPrompt);
+        const cleaned = response.replace(/```json|```/g, '').trim();
+        finalResult = JSON.parse(cleaned);
+      } catch (e) {
+        console.warn("AI context generation failed, using Local Medical Advisor fallback:", e);
+        // Robust Fallback from our Local Medical Advisor
+        finalResult = {
+          possible_conditions: [{
+            name: predicted_disease,
+            probability: `High (${confidence}%)`,
+            description: `The local ML engine has identified ${predicted_disease} based on your symptoms.`,
+            symptoms_match: recognized_symptoms
+          }],
+          severity: confidence > 80 ? "Moderate" : "Mild",
+          recommendation: "Please consult a primary care physician for a formal evaluation and treatment plan.",
+          immediate_action: localAdvice.specialist === "Emergency Medicine Physician",
+          precautions: localAdvice.precautions,
+          specialist_recommendation: localAdvice.specialist,
+          do_list: localAdvice.do_list,
+          dont_list: localAdvice.dont_list,
+          questions_to_ask_doctor: ["What diagnostic tests are needed?", "Are there lifestyle changes I should make?", "What is the expected recovery timeline?"],
+          disclaimer: "Analysis anchored by local ML engine. Offline advisor fallback active."
+        };
+      }
       
       setResult(finalResult);
     } catch (err) {
       console.error("Symptom Analysis Flow Error:", err);
-      setError("The AI Diagnostic Engine is currently unavailable. Please try again later.");
+      setError(err.message);
     } finally {
       setIsAnalyzing(false);
     }
@@ -113,10 +205,22 @@ Generate your response in EXACTLY this JSON format (no markdown, no extra text):
         <p className="text-gray-600">Enter your symptoms and get AI-powered insights about possible conditions</p>
         
         <div className="mt-4 flex justify-center">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            AI Diagnostic Engine Online
-          </span>
+          {backendStatus === 'online' ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-xs font-medium border border-green-200">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              Local ML Engine Online
+            </span>
+          ) : backendStatus === 'offline' ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-xs font-medium border border-red-200">
+              <span className="w-2 h-2 rounded-full bg-red-500" />
+              Local ML Engine Offline - Please Start Backend
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 text-gray-600 text-xs font-medium border border-gray-200">
+              <div className="w-2 h-2 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              Checking Engine Status...
+            </span>
+          )}
         </div>
       </div>
 
