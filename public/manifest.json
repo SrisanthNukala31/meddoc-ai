@@ -1,0 +1,37 @@
+{
+  "name": "MedDoc AI - Medical Assistant",
+  "short_name": "MedDoc AI",
+  "description": "AI-powered medical document analysis, symptom checker, and health management platform.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0f1e",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "medical", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Symptom Checker",
+      "url": "/symptom-checker",
+      "description": "Check your symptoms with AI"
+    },
+    {
+      "name": "Dashboard",
+      "url": "/dashboard",
+      "description": "View your health dashboard"
+    }
+  ]
+}
